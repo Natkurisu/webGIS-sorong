@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Asap Karhutla Kabupaten Sorong – Fasilitas Terdampak</title>
+  <meta name="description" content="WebGIS pemodelan sebaran asap karhutla dan fasilitas sosial serta vital yang terdampak di Kabupaten Sorong. PjBL SIG GD4103, Kelompok 6 K-02.">
+  <link rel="stylesheet" href="lib/leaflet/leaflet.css">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div id="app">
+    <aside id="panel" aria-label="Panel informasi">
+      <header class="kepala">
+        <h1>Asap karhutla Kabupaten Sorong</h1>
+        <p class="sub">Fasilitas sosial dan vital yang terdampak, per waktu pemodelan</p>
+        <p id="demo" class="demo" hidden>Data contoh. Peta ini belum memakai hasil model.</p>
+      </header>
+
+      <div class="tab" role="tablist">
+        <button role="tab" id="tab-fas" aria-controls="isi-fas" aria-selected="true">Fasilitas</button>
+        <button role="tab" id="tab-atur" aria-controls="isi-atur" aria-selected="false">Skenario</button>
+        <button role="tab" id="tab-val" aria-controls="isi-val" aria-selected="false">Validasi</button>
+        <button role="tab" id="tab-lapis" aria-controls="isi-lapis" aria-selected="false">Layer</button>
+      </div>
+
+      <section id="isi-fas" role="tabpanel" aria-labelledby="tab-fas">
+        <div class="ringkas">
+          <div><strong id="n-kena">0</strong><span>terdampak saat ini</span></div>
+          <div><strong id="n-total">0</strong><span>fasilitas dipantau</span></div>
+        </div>
+        <label class="cari"><span class="sr">Cari fasilitas</span>
+          <input id="cari" type="search" placeholder="Cari nama fasilitas atau distrik" autocomplete="off">
+        </label>
+        <div id="jenis" class="chip-baris" aria-label="Saring jenis fasilitas"></div>
+        <div class="baris">
+          <label for="ambang">Terdampak mulai kelas</label>
+          <select id="ambang">
+            <option value="1">Sedang</option>
+            <option value="2" selected>Tinggi</option>
+            <option value="3">Sangat tinggi</option>
+          </select>
+        </div>
+        <div class="baris">
+          <label class="cek"><input type="checkbox" id="hanya-kena" checked> Hanya yang terdampak</label>
+          <button id="unduh" class="tautan" type="button">Unduh CSV</button>
+        </div>
+        <ol id="daftar" class="daftar"></ol>
+        <p id="kosong" class="kosong" hidden></p>
+      </section>
+
+      <section id="isi-atur" role="tabpanel" aria-labelledby="tab-atur" hidden>
+        <h2>Bobot sumber emisi</h2>
+        <p class="ket">Peta dihitung ulang langsung dari sumbangan tiap kelompok sumber.</p>
+        <div class="geser">
+          <label for="gambut">Faktor gambut <output id="gambut-o">3</output>×</label>
+          <input id="gambut" type="range" min="1" max="6" step="0.5" value="3">
+        </div>
+        <fieldset id="sumber" class="sumber"><legend>Kelompok sumber aktif</legend></fieldset>
+
+        <h2>Bobot skor keterdampakan</h2>
+        <p class="ket">Menentukan urutan daftar, bukan status terdampak.</p>
+        <div class="geser"><label for="w-s">Sensitivitas jenis <output id="w-s-o"></output></label><input id="w-s" type="range" min="0" max="100" value="54"></div>
+        <div class="geser"><label for="w-i">Nilai puncak asap <output id="w-i-o"></output></label><input id="w-i" type="range" min="0" max="100" value="30"></div>
+        <div class="geser"><label for="w-d">Durasi terdampak <output id="w-d-o"></output></label><input id="w-d" type="range" min="0" max="100" value="16"></div>
+        <button id="reset" class="tombol" type="button">Kembalikan ke awal</button>
+
+        <h2>Simulasi cepat plume</h2>
+        <p class="ket">Plume Gauss sederhana untuk penapisan awal. Tidak memakai hasil model dan tidak menggantikannya.</p>
+        <button id="pl-pilih" class="tombol" type="button" aria-pressed="false">Pilih lokasi sumber di peta</button>
+        <div class="geser"><label for="pl-arah">Angin dari arah <output id="pl-arah-o">135</output>°</label><input id="pl-arah" type="range" min="0" max="355" step="5" value="135"></div>
+        <div class="geser"><label for="pl-u">Kecepatan angin <output id="pl-u-o">3</output>&nbsp;m/s</label><input id="pl-u" type="range" min="1" max="10" step="0.5" value="3"></div>
+        <div class="geser"><label for="pl-q">Intensitas sumber <output id="pl-q-o">1</output>×</label><input id="pl-q" type="range" min="0.5" max="5" step="0.5" value="1"></div>
+        <p id="pl-hasil" class="ket"></p>
+        <button id="pl-hapus" class="tautan" type="button" hidden>Hapus plume</button>
+      </section>
+
+      <section id="isi-val" role="tabpanel" aria-labelledby="tab-val" hidden>
+        <h2>Model terhadap AOD satelit</h2>
+        <p class="ket">Sel model berkelas sedang ke atas dibandingkan dengan sel AOD di atas ambang. Sel tanpa AOD (berawan) tidak dihitung.</p>
+        <label class="cek"><input type="checkbox" id="v-aktif"> Tampilkan peta cocok, luput, dan alarm palsu</label>
+        <div class="geser"><label for="v-aod">Ambang AOD <output id="v-aod-o">0,5</output></label><input id="v-aod" type="range" min="0.1" max="2" step="0.05" value="0.5"></div>
+        <dl id="v-angka" class="angka"></dl>
+        <p id="v-pesan" class="ket"></p>
+      </section>
+
+      <section id="isi-lapis" role="tabpanel" aria-labelledby="tab-lapis" hidden>
+        <h2>Peta dasar</h2>
+        <div class="pilih" id="dasar">
+          <label><input type="radio" name="dasar" value="terang" checked> Peta terang</label>
+          <label><input type="radio" name="dasar" value="osm"> OpenStreetMap</label>
+          <label><input type="radio" name="dasar" value="citra"> Citra satelit harian (NASA GIBS)</label>
+        </div>
+        <h2>Layer</h2>
+        <div class="pilih">
+          <label><input type="checkbox" id="l-asap" checked> Sebaran asap</label>
+          <label><input type="checkbox" id="l-fas" checked> Fasilitas</label>
+          <label><input type="checkbox" id="l-sumber" checked> Kelompok sumber api</label>
+          <label><input type="checkbox" id="l-batas" checked> Batas Kabupaten Sorong</label>
+        </div>
+        <div class="geser">
+          <label for="alpha">Transparansi asap <output id="alpha-o">45</output>%</label>
+          <input id="alpha" type="range" min="0" max="90" step="5" value="45">
+        </div>
+        <div class="pilih">
+          <label><input type="radio" name="mode" value="kelas" checked> Tampilkan kelas asap</label>
+          <label><input type="radio" name="mode" value="indeks"> Tampilkan indeks 0–1</label>
+        </div>
+        <h2>Tentang</h2>
+        <p class="ket">PjBL SIG GD4103, Teknik Geodesi dan Geomatika ITB. Kelompok 6 K-02. Nilai asap adalah indeks relatif, bukan konsentrasi PM2,5 terukur.</p>
+        <p class="ket" id="catatan-data"></p>
+      </section>
+    </aside>
+
+    <main id="peta-wadah">
+      <button id="buka" class="buka" type="button" aria-expanded="true" aria-controls="panel">Panel</button>
+      <div id="peta" aria-label="Peta sebaran asap"></div>
+
+      <div id="legenda" class="legenda" aria-label="Legenda"></div>
+
+      <article id="rinci" class="rinci" hidden aria-live="polite">
+        <button id="tutup-rinci" class="tutup" type="button" aria-label="Tutup rincian">×</button>
+        <h3 id="r-nama"></h3>
+        <p id="r-meta" class="ket"></p>
+        <dl id="r-angka"></dl>
+        <div class="grafik"><canvas id="r-grafik" height="130"></canvas></div>
+      </article>
+
+      <footer id="waktu" class="waktu">
+        <button id="putar" type="button" aria-label="Putar animasi">▶</button>
+        <div class="w-tengah">
+          <div class="w-label"><strong id="w-teks"></strong><span id="w-hitung"></span></div>
+          <div id="w-batang" class="w-batang" role="presentation"></div>
+          <input id="w-geser" type="range" min="0" max="0" step="1" value="0" aria-label="Waktu pemodelan">
+        </div>
+      </footer>
+    </main>
+  </div>
+
+  <script src="lib/leaflet/leaflet.js"></script>
+  <script src="lib/chart.umd.min.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
